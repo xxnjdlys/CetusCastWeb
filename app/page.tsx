@@ -1,627 +1,577 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
-import {
-  motion,
-  useReducedMotion,
-  useScroll,
-  useMotionValueEvent,
-} from "motion/react"
-import {
-  Broadcast,
-  Television,
-  Radio,
-  Images,
-  WifiHigh,
-  ShieldCheck,
-  ArrowRight,
-  CheckCircle,
-} from "@phosphor-icons/react"
-import Image from "next/image"
-import { translations, type Lang, type Translations } from "./translations"
+import { useEffect, useRef, useState } from "react"
 
-// =============================================================================
-// i18n context
-// =============================================================================
+const PLAY_URL =
+  "https://play.google.com/store/apps/details?id=miracast.chromecast.tvcast.screenmirroring.cetuscast"
+const ICON_URL =
+  "https://play-lh.googleusercontent.com/bLxeIaiJ4_5Olb_x44EEQgzYi-ocpMtVXJn8xZPdlVkgmF6SNBZ4qrMpz71Nj4MiK8UY=w240-h480-rw"
 
-type LangCtx = { lang: Lang; setLang: (l: Lang) => void }
-const LangContext = createContext<LangCtx>({ lang: "en", setLang: () => {} })
-function useLang() { return useContext(LangContext) }
-function useT(): Translations {
-  const { lang } = useLang()
-  return translations[lang] as unknown as Translations
+type Dot = {
+  id: number
+  left: string
+  top: string
+  cyan: boolean
 }
 
-// =============================================================================
-// Static config (non-translatable: icons, styling, image seeds)
-// =============================================================================
+function ParticleCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-const FEATURE_STATIC = [
-  {
-    icon: Television,
-    colSpan: "md:col-span-2 lg:col-span-2",
-    bg: "bg-blue-500/8 border-blue-500/18",
-    accent: "text-blue-300",
-    imageSeed: "smart-tv-living-room-dark",
-    showImage: true,
-  },
-  {
-    icon: Radio,
-    colSpan: "",
-    bg: "bg-zinc-800/60 border-zinc-700/50",
-    accent: "text-blue-400",
-    showImage: false,
-  },
-  {
-    icon: Images,
-    colSpan: "",
-    bg: "bg-gradient-to-br from-zinc-800/80 to-zinc-900 border-zinc-700/50",
-    accent: "text-blue-400",
-    showImage: false,
-  },
-  {
-    icon: WifiHigh,
-    colSpan: "",
-    bg: "bg-zinc-800/60 border-zinc-700/50",
-    accent: "text-blue-400",
-    showImage: false,
-  },
-  {
-    icon: ShieldCheck,
-    colSpan: "",
-    bg: "bg-zinc-900 border-blue-500/15",
-    accent: "text-blue-400",
-    showImage: false,
-  },
-] as const
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext("2d")
+    if (!canvas || !ctx) return
 
-const STEP_STATIC = [
-  { num: "01", imageSeed: "wifi-home-network-router" },
-  { num: "02", imageSeed: "phone-gallery-media-scroll" },
-  { num: "03", imageSeed: "large-tv-screen-dark-room" },
-] as const
+    let width = 0
+    let height = 0
+    let frameId = 0
+    const mouse = { x: -9999, y: -9999 }
+    const pointCount = 68
+    const distance = 125
+    const points = Array.from({ length: pointCount }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+    }))
 
-const SHOT_SEEDS = [
-  "phone-cast-device-list",
-  "phone-media-file-browser",
-  "phone-video-playback-ui",
-  "phone-audio-music-cast",
-] as const
+    const resize = () => {
+      width = canvas.width = window.innerWidth
+      height = canvas.height = window.innerHeight
+    }
 
-// =============================================================================
-// Primitive: fade-up scroll reveal
-// =============================================================================
+    const onMouseMove = (event: MouseEvent) => {
+      mouse.x = event.clientX
+      mouse.y = event.clientY
+    }
 
-function Reveal({
-  children,
-  delay = 0,
-  className,
-}: {
+    const frame = () => {
+      ctx.clearRect(0, 0, width, height)
+
+      points.forEach((point) => {
+        const dx = point.x - mouse.x
+        const dy = point.y - mouse.y
+        const d = Math.hypot(dx, dy)
+
+        if (d > 0 && d < 150) {
+          const force = ((150 - d) / 150) * 0.04
+          point.vx += (dx / d) * force
+          point.vy += (dy / d) * force
+        }
+
+        point.vx *= 0.994
+        point.vy *= 0.994
+        point.x += point.vx
+        point.y += point.vy
+
+        if (point.x < 0) point.x = width
+        if (point.x > width) point.x = 0
+        if (point.y < 0) point.y = height
+        if (point.y > height) point.y = 0
+
+        ctx.beginPath()
+        ctx.arc(point.x, point.y, 1.2, 0, Math.PI * 2)
+        ctx.fillStyle = "rgba(0,234,255,.35)"
+        ctx.fill()
+      })
+
+      for (let i = 0; i < points.length; i++) {
+        for (let j = i + 1; j < points.length; j++) {
+          const d = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y)
+          if (d < distance) {
+            ctx.beginPath()
+            ctx.strokeStyle = `rgba(0,234,255,${(1 - d / distance) * 0.15})`
+            ctx.lineWidth = 0.5
+            ctx.moveTo(points[i].x, points[i].y)
+            ctx.lineTo(points[j].x, points[j].y)
+            ctx.stroke()
+          }
+        }
+      }
+
+      frameId = requestAnimationFrame(frame)
+    }
+
+    resize()
+    window.addEventListener("resize", resize)
+    window.addEventListener("mousemove", onMouseMove)
+    frame()
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      window.removeEventListener("resize", resize)
+      window.removeEventListener("mousemove", onMouseMove)
+    }
+  }, [])
+
+  return <canvas ref={canvasRef} id="particle-canvas" aria-hidden="true" />
+}
+
+function Reveal({ children, delay = 0, className = "" }: {
   children: React.ReactNode
   delay?: number
   className?: string
 }) {
-  const reduce = useReducedMotion()
   return (
-    <motion.div
-      className={className}
-      initial={reduce ? false : { opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] }}
-    >
+    <div className={`reveal ${className}`} style={{ transitionDelay: `${delay}s` }}>
       {children}
-    </motion.div>
+    </div>
   )
 }
 
-// =============================================================================
-// NavBar
-// =============================================================================
-
-function NavBar() {
-  const [solid, setSolid] = useState(false)
-  const { scrollY } = useScroll()
-  const { lang, setLang } = useLang()
-  const t = useT()
-  useMotionValueEvent(scrollY, "change", (y) => setSolid(y > 24))
-
-  const navLinks: [string, string][] = [
-    [t.nav.features, "#features"],
-    [t.nav.how, "#how"],
-    [t.nav.screenshots, "#screenshots"],
-    [t.nav.privacy, "#privacy"],
-  ]
-
-  return (
-    <header
-      className={`fixed top-0 inset-x-0 z-50 h-16 transition-all duration-300 ${
-        solid ? "bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800/60" : ""
-      }`}
-    >
-      <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between gap-6">
-        {/* Logo */}
-        <a href="#" className="flex items-center gap-2.5 shrink-0">
-          <span className="w-7 h-7 rounded-lg bg-blue-500 grid place-items-center">
-            <Broadcast size={14} weight="fill" className="text-white" />
-          </span>
-          <span className="font-semibold text-[15px] tracking-tight text-zinc-50 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-            CetusCast
-          </span>
-        </a>
-
-        {/* Nav links */}
-        <nav className="hidden md:flex items-center gap-7">
-          {navLinks.map(([label, href]) => (
-            <a
-              key={href}
-              href={href}
-              className="text-sm text-zinc-400 hover:text-zinc-50 transition-colors"
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
-
-        {/* Right: lang toggle + download CTA */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden md:flex items-center border border-zinc-700 rounded-lg overflow-hidden text-sm">
-            {(["en", "zh"] as Lang[]).map((l) => (
-              <button
-                key={l}
-                onClick={() => setLang(l)}
-                className={`px-2.5 h-8 transition-colors ${
-                  lang === l
-                    ? "bg-zinc-700 text-zinc-50"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {l === "en" ? "EN" : "中文"}
-              </button>
-            ))}
-          </div>
-
-          <a
-            href="#download"
-            className="inline-flex items-center gap-1.5 h-9 px-4 bg-blue-500 hover:bg-blue-400 active:scale-[0.97] text-white text-sm font-medium rounded-lg transition-all"
-          >
-            {t.nav.download}
-            <ArrowRight size={13} weight="bold" />
-          </a>
-        </div>
-      </div>
-    </header>
-  )
-}
-
-// =============================================================================
-// Hero: Asymmetric Split
-// =============================================================================
-
-function HeroSection() {
-  const reduce = useReducedMotion()
-  const t = useT()
-  const fadeUp = (delay: number) =>
-    ({
-      initial: reduce ? false : { opacity: 0, y: 22 },
-      animate: { opacity: 1, y: 0 },
-      transition: { duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] },
-    }) as const
-
-  return (
-    <section className="min-h-[100dvh] flex items-center pt-16 pb-16 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-
-        {/* Left — copy */}
-        <div className="space-y-7 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-          <motion.div className="flex flex-wrap gap-2" {...fadeUp(0)}>
-            {["DLNA", "AirPlay", "Android"].map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center h-6 px-2.5 text-[11px] text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-md [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]"
-              >
-                {tag}
-              </span>
-            ))}
-          </motion.div>
-
-          <motion.h1
-            className="text-5xl lg:text-[3.5rem] font-bold tracking-tighter leading-[1.06] text-zinc-50"
-            {...fadeUp(0.08)}
-          >
-            {t.hero.headline1}
-            <br />
-            <span className="text-blue-400">{t.hero.headline2}</span>
-          </motion.h1>
-
-          <motion.p
-            className="text-lg text-zinc-400 leading-relaxed max-w-[38ch]"
-            {...fadeUp(0.15)}
-          >
-            {t.hero.subtext}
-          </motion.p>
-
-          <motion.div className="flex flex-wrap gap-3 pt-1" {...fadeUp(0.22)}>
-            <a
-              href="#download"
-              className="inline-flex items-center gap-2 h-11 px-5 bg-blue-500 hover:bg-blue-400 active:scale-[0.97] text-white font-medium rounded-xl transition-all text-sm"
-            >
-              {t.hero.cta}
-              <ArrowRight size={14} weight="bold" />
-            </a>
-            <a
-              href="#features"
-              className="inline-flex items-center h-11 px-5 text-sm text-zinc-300 hover:text-zinc-50 border border-zinc-700 hover:border-zinc-500 rounded-xl transition-all"
-            >
-              {t.hero.ctaSecondary}
-            </a>
-          </motion.div>
-        </div>
-
-        {/* Right — phone mockup */}
-        <motion.div
-          className="flex justify-center lg:justify-end relative"
-          initial={reduce ? false : { opacity: 0, x: 28 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.65, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <div className="absolute inset-0 pointer-events-none" aria-hidden>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-blue-500/12 blur-3xl" />
-          </div>
-          <div className="relative w-[240px] h-[490px] rounded-[34px] border-2 border-zinc-700 shadow-2xl overflow-hidden bg-zinc-900">
-            <Image
-              src="https://picsum.photos/seed/android-media-cast-phone/480/980"
-              alt="CetusCast app running on Android phone"
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/30 via-transparent to-zinc-950/60" />
-          </div>
-        </motion.div>
-
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// Protocol Strip
-// =============================================================================
-
-function ProtocolStrip() {
-  const t = useT()
-  return (
-    <section className="border-y border-zinc-800/70 py-5 bg-zinc-900/30">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
-          {t.protocols.map((item) => (
-            <span
-              key={item}
-              className="flex items-center gap-2 text-sm text-zinc-500 [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]"
-            >
-              <CheckCircle size={13} weight="fill" className="text-blue-500 shrink-0" />
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// Features: Bento Grid
-// =============================================================================
-
-function FeaturesGrid() {
-  const t = useT()
-  return (
-    <section id="features" className="py-24">
-      <div className="max-w-6xl mx-auto px-6">
-        <Reveal className="mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-zinc-50 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-            {t.features.title}
-          </h2>
-          <p className="mt-3 text-zinc-400 max-w-[44ch]">
-            {t.features.subtitle}
-          </p>
-        </Reveal>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-[220px]">
-          {FEATURE_STATIC.map((feat, i) => {
-            const Icon = feat.icon
-            const item = t.features.items[i]
-            return (
-              <Reveal key={item.title} delay={i * 0.06} className={`h-full ${feat.colSpan}`}>
-                <div className={`relative h-full rounded-2xl border p-6 flex flex-col justify-between overflow-hidden ${feat.bg}`}>
-                  {feat.showImage && "imageSeed" in feat && feat.imageSeed && (
-                    <div className="absolute inset-0 opacity-15 pointer-events-none">
-                      <Image
-                        src={`https://picsum.photos/seed/${feat.imageSeed}/800/440`}
-                        alt=""
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                  <Icon size={24} weight="duotone" className={`relative z-10 ${feat.accent}`} />
-                  <div className="relative z-10">
-                    <h3 className="font-semibold text-zinc-50 mb-1.5 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-zinc-400 leading-relaxed">{item.body}</p>
-                  </div>
-                </div>
-              </Reveal>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// How It Works
-// =============================================================================
-
-function HowItWorks() {
-  const t = useT()
-  return (
-    <section id="how" className="py-24 bg-zinc-900/40">
-      <div className="max-w-6xl mx-auto px-6">
-        <Reveal className="mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-zinc-50 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-            {t.howItWorks.title}
-          </h2>
-        </Reveal>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {STEP_STATIC.map((step, i) => {
-            const item = t.howItWorks.items[i]
-            return (
-              <Reveal key={step.num} delay={i * 0.1}>
-                <div className="flex flex-col gap-5">
-                  <div className="relative h-48 rounded-xl overflow-hidden bg-zinc-800">
-                    <Image
-                      src={`https://picsum.photos/seed/${step.imageSeed}/600/384`}
-                      alt={item.title}
-                      fill
-                      className="object-cover opacity-75"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-transparent to-transparent" />
-                    <span className="absolute bottom-3 left-4 text-[11px] text-zinc-500 tracking-wider [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]">
-                      {step.num}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="inline-block text-xs text-blue-400 mb-2 [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]">
-                      {item.verb}
-                    </span>
-                    <h3 className="font-semibold text-zinc-50 mb-2 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-zinc-400 leading-relaxed">{item.body}</p>
-                  </div>
-                </div>
-              </Reveal>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// Screenshots: horizontal scroll-snap
-// =============================================================================
-
-function Screenshots() {
-  const t = useT()
-  return (
-    <section id="screenshots" className="py-24 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-6">
-        <Reveal className="mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-zinc-50 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-            {t.screenshots.title}
-          </h2>
-        </Reveal>
-      </div>
-
-      <div
-        className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-4"
-        style={{ paddingLeft: "max(1.5rem, calc((100vw - 72rem) / 2))" }}
-      >
-        {SHOT_SEEDS.map((seed, i) => {
-          const caption = t.screenshots.captions[i]
-          return (
-            <Reveal key={seed} delay={i * 0.07} className="snap-start shrink-0">
-              <div className="flex flex-col gap-3 w-[200px]">
-                <div className="relative h-[400px] rounded-[28px] border border-zinc-700/80 overflow-hidden bg-zinc-900 shadow-lg">
-                  <Image
-                    src={`https://picsum.photos/seed/${seed}/400/800`}
-                    alt={caption}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <p className="text-xs text-zinc-500 text-center [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]">
-                  {caption}
-                </p>
-              </div>
-            </Reveal>
-          )
-        })}
-        <div className="shrink-0 w-6" aria-hidden />
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// Privacy Statement
-// =============================================================================
-
-function PrivacyStatement() {
-  const t = useT()
-  return (
-    <section id="privacy" className="py-28 bg-zinc-900/60 border-y border-zinc-800/70">
-      <div className="max-w-3xl mx-auto px-6 text-center">
-        <Reveal>
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 mb-6">
-            <ShieldCheck size={28} weight="duotone" className="text-blue-400" />
-          </div>
-        </Reveal>
-        <Reveal delay={0.07}>
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-zinc-50 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-            {t.privacy.title1}
-            <br />
-            {t.privacy.title2}
-          </h2>
-        </Reveal>
-        <Reveal delay={0.13}>
-          <p className="mt-5 text-zinc-400 text-lg leading-relaxed max-w-[42ch] mx-auto">
-            {t.privacy.body}
-          </p>
-        </Reveal>
-        <Reveal delay={0.19}>
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
-            {t.privacy.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1.5 px-3 h-8 text-sm text-zinc-300 bg-zinc-800 rounded-lg border border-zinc-700"
-              >
-                <CheckCircle size={13} weight="fill" className="text-blue-400" />
-                {tag}
-              </span>
-            ))}
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// Download CTA
-// =============================================================================
-
-function DownloadCTA() {
-  const t = useT()
-  return (
-    <section id="download" className="py-8 px-6">
-      <div className="max-w-6xl mx-auto">
-        <Reveal>
-          <div className="relative rounded-3xl overflow-hidden bg-zinc-900 min-h-[360px] flex items-center justify-center text-center px-8 py-16">
-            <Image
-              src="https://picsum.photos/seed/home-theater-couch-tv/1200/720"
-              alt=""
-              fill
-              className="object-cover opacity-20"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-zinc-950/50 to-zinc-950/85" />
-
-            <div className="relative z-10 flex flex-col items-center gap-6 max-w-sm">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-zinc-50 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-                {t.download.title}
-              </h2>
-              <p className="text-zinc-400 text-base">{t.download.subtitle}</p>
-
-              <a
-                href="https://play.google.com/store"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 h-14 px-7 bg-blue-500 hover:bg-blue-400 active:scale-[0.97] text-white font-semibold rounded-2xl transition-all text-[15px] shadow-lg shadow-blue-500/25"
-              >
-                <img
-                  src="https://cdn.simpleicons.org/googleplay/ffffff"
-                  alt="Google Play"
-                  width={20}
-                  height={20}
-                  aria-hidden
-                />
-                {t.download.cta}
-              </a>
-
-              <p className="text-sm text-zinc-600 [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]">
-                {t.download.footnote}
-              </p>
-            </div>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-// =============================================================================
-// Footer
-// =============================================================================
-
-function Footer() {
-  const t = useT()
-  return (
-    <footer className="border-t border-zinc-800/70 py-8 mt-4">
-      <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-md bg-blue-500 grid place-items-center">
-            <Broadcast size={12} weight="fill" className="text-white" />
-          </span>
-          <span className="text-sm font-medium text-zinc-400 [font-family:var(--font-geist-sans,Geist,system-ui,sans-serif)]">
-            CetusCast
-          </span>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <a
-            href="https://cast.yummbj.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-zinc-600 hover:text-zinc-400 transition-colors"
-          >
-            {t.footer.officialSite}
-          </a>
-          <a href="#privacy" className="text-sm text-zinc-600 hover:text-zinc-400 transition-colors">
-            {t.footer.privacyPolicy}
-          </a>
-        </div>
-
-        <p className="text-xs text-zinc-700 [font-family:var(--font-geist-mono,'Geist_Mono',monospace)]">
-          © 2024 CetusCast
-        </p>
-      </div>
-    </footer>
-  )
-}
-
-// =============================================================================
-// Page export
-// =============================================================================
-
-export default function CetusCastPage() {
-  const [lang, setLang] = useState<Lang>("en")
+function HeroTitle() {
+  const [main, setMain] = useState("Cetus")
+  const [sub, setSub] = useState("Cast")
 
   useEffect(() => {
-    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en"
-  }, [lang])
+    const pool = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*<>+=?|#~"
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    const scramble = (
+      target: string,
+      setter: (value: string) => void,
+      onDone?: () => void,
+    ) => {
+      let resolved = 0
+      let stopped = false
+
+      const render = () => {
+        if (stopped) return
+        let value = target.slice(0, resolved)
+        for (let i = resolved; i < target.length; i++) {
+          value += pool[Math.floor(Math.random() * pool.length)]
+        }
+        setter(value)
+        timers.push(setTimeout(render, 38))
+      }
+
+      const lock = () => {
+        resolved += 1
+        if (resolved >= target.length) {
+          stopped = true
+          setter(target)
+          onDone?.()
+          return
+        }
+        timers.push(setTimeout(lock, 95))
+      }
+
+      render()
+      timers.push(setTimeout(lock, 95))
+    }
+
+    timers.push(setTimeout(() => {
+      scramble("Cetus", setMain, () => {
+        timers.push(setTimeout(() => scramble("Cast", setSub), 160))
+      })
+    }, 400))
+
+    return () => timers.forEach(clearTimeout)
+  }, [])
 
   return (
-    <LangContext.Provider value={{ lang, setLang }}>
-      <div className="bg-zinc-950 text-zinc-50 min-h-screen antialiased">
-        <NavBar />
-        <main>
-          <HeroSection />
-          <ProtocolStrip />
-          <FeaturesGrid />
-          <HowItWorks />
-          <Screenshots />
-          <PrivacyStatement />
-          <DownloadCTA />
-        </main>
-        <Footer />
-      </div>
-    </LangContext.Provider>
+    <h1 className="hero-title" data-text="CETUSCAST">
+      <span className="h1-main">{main}</span>
+      <span className="h1-sub">{sub}</span>
+    </h1>
+  )
+}
+
+function useRevealEffects() {
+  useEffect(() => {
+    const revealTargets = Array.from(document.querySelectorAll(".reveal"))
+    const revealObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("vis")
+            revealObserver.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12 },
+    )
+    revealTargets.forEach((element) => revealObserver.observe(element))
+
+    const heroTimer = setTimeout(() => {
+      document.querySelectorAll(".hero .reveal").forEach((element) => element.classList.add("vis"))
+    }, 150)
+
+    const missionGrid = document.getElementById("mission-grid")
+    const missionObserver = missionGrid
+      ? new IntersectionObserver(
+          ([entry], observer) => {
+            if (!entry.isIntersecting) return
+            document.querySelectorAll(".mission").forEach((mission, index) => {
+              setTimeout(() => mission.classList.add("vis"), index * 130)
+            })
+            observer.disconnect()
+          },
+          { threshold: 0.1 },
+        )
+      : null
+    if (missionGrid) missionObserver?.observe(missionGrid)
+
+    const checks = document.getElementById("check-list")
+    const checkObserver = checks
+      ? new IntersectionObserver(
+          ([entry], observer) => {
+            if (!entry.isIntersecting) return
+            document.querySelectorAll(".check").forEach((check, index) => {
+              setTimeout(() => check.classList.add("vis"), index * 160)
+            })
+            observer.disconnect()
+          },
+          { threshold: 0.2 },
+        )
+      : null
+    if (checks) checkObserver?.observe(checks)
+
+    const hudTimer = setTimeout(() => {
+      document.querySelectorAll(".hud-card").forEach((card, index) => {
+        setTimeout(() => card.classList.add("vis"), 900 + index * 350)
+      })
+    }, 300)
+
+    return () => {
+      clearTimeout(heroTimer)
+      clearTimeout(hudTimer)
+      revealObserver.disconnect()
+      missionObserver?.disconnect()
+      checkObserver?.disconnect()
+    }
+  }, [])
+}
+
+function Counter() {
+  const [value, setValue] = useState(0)
+  const ref = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+
+    const observer = new IntersectionObserver(
+      ([entry], obs) => {
+        if (!entry.isIntersecting) return
+        let current = 0
+        const target = 50
+        const interval = setInterval(() => {
+          current = Math.min(current + Math.ceil(target / 36), target)
+          setValue(current)
+          if (current >= target) clearInterval(interval)
+        }, 45)
+        obs.disconnect()
+      },
+      { threshold: 0.5 },
+    )
+
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  return <b ref={ref}>{value}K+</b>
+}
+
+function Terminal() {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [content, setContent] = useState<React.ReactNode[]>([])
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+
+    const lines = [
+      { text: "$ initialize cast session", className: "c" },
+      { text: "✓ scan local network for TV / DLNA devices", className: "g" },
+      { text: "✓ select photo, video, or audio payload", className: "g" },
+      { text: "✓ route media stream to big screen", className: "g" },
+      { text: "✓ keep playback controls available on phone", className: "g" },
+      { text: "" },
+      { text: "DEVICE CATEGORY: TOOLS" },
+      { text: "STORE STATUS: GOOGLE PLAY LISTED" },
+      { text: "UPDATED AT: 2026-06-11" },
+      { text: "DOWNLOADS: 50K+" },
+      { text: "" },
+      { text: "primary action: open Google Play listing", className: "c" },
+    ]
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let started = false
+
+    const observer = new IntersectionObserver(
+      ([entry], obs) => {
+        if (!entry.isIntersecting || started) return
+        started = true
+        obs.disconnect()
+
+        let lineIndex = 0
+        const nextLine = () => {
+          if (lineIndex >= lines.length) {
+            setContent((old) => [...old, <span key="cursor" className="cursor" />])
+            return
+          }
+
+          const line = lines[lineIndex]
+          lineIndex += 1
+          let charIndex = 0
+          const key = `line-${lineIndex}`
+
+          const typeChar = () => {
+            if (charIndex < line.text.length) {
+              const text = line.text.slice(0, charIndex + 1)
+              setContent((old) => [
+                ...old.filter((item) => (item as React.ReactElement).key !== key),
+                <span key={key} className={line.className}>{text}</span>,
+              ])
+              charIndex += 1
+              timers.push(setTimeout(typeChar, line.text.startsWith("$") ? 38 : 16))
+              return
+            }
+
+            setContent((old) => [...old, <span key={`${key}-br`}>{"\n"}</span>])
+            timers.push(setTimeout(nextLine, line.text === "" ? 70 : 100))
+          }
+
+          typeChar()
+        }
+
+        nextLine()
+      },
+      { threshold: 0.25 },
+    )
+
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      timers.forEach(clearTimeout)
+    }
+  }, [])
+
+  return (
+    <div className="term-out" ref={ref}>
+      {content}
+    </div>
+  )
+}
+
+function RadarDots() {
+  const [dots, setDots] = useState<Dot[]>([])
+
+  useEffect(() => {
+    let mounted = true
+    let id = 0
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    const spawnBatch = () => {
+      if (!mounted) return
+      const count = Math.random() < 0.3 ? Math.floor(Math.random() * 2) + 2 : 1
+      for (let i = 0; i < count; i++) {
+        timers.push(setTimeout(() => {
+          const angle = Math.random() * Math.PI * 2
+          const dist = 14 + Math.random() * 32
+          const dot = {
+            id: id++,
+            left: `calc(50% + ${Math.cos(angle) * dist}%)`,
+            top: `calc(50% + ${Math.sin(angle) * dist}%)`,
+            cyan: Math.random() < 0.25,
+          }
+          setDots((old) => [...old, dot])
+          timers.push(setTimeout(() => {
+            setDots((old) => old.filter((item) => item.id !== dot.id))
+          }, 3700))
+        }, i * (180 + Math.random() * 320)))
+      }
+      timers.push(setTimeout(spawnBatch, 1800 + Math.random() * 3700))
+    }
+
+    spawnBatch()
+    return () => {
+      mounted = false
+      timers.forEach(clearTimeout)
+    }
+  }, [])
+
+  return (
+    <>
+      {dots.map((dot) => (
+        <div
+          key={dot.id}
+          className={`radar-dot${dot.cyan ? " cyan" : ""}`}
+          style={{ left: dot.left, top: dot.top }}
+        />
+      ))}
+    </>
+  )
+}
+
+function PlayMark() {
+  return <span className="play-mark" aria-hidden="true" />
+}
+
+export default function CetusCastPage() {
+  useRevealEffects()
+
+  useEffect(() => {
+    document.documentElement.lang = "en"
+  }, [])
+
+  return (
+    <>
+      <ParticleCanvas />
+      <div className="hud-frame" aria-hidden="true" />
+      <div className="corner-a" aria-hidden="true" />
+      <div className="corner-b" aria-hidden="true" />
+
+      <nav className="nav" aria-label="Primary navigation">
+        <div className="shell nav-inner">
+          <a className="brand" href="#top">
+            <img src={ICON_URL} alt="CetusCast app icon" />
+            <span>CetusCast</span>
+          </a>
+          <div className="nav-links">
+            <a href="#mission">Features</a>
+            <a href="#ops">How It Works</a>
+            <a href="#safety">Privacy</a>
+            <a href="#download">Download</a>
+          </div>
+          <a className="hud-btn primary" href={PLAY_URL} target="_blank" rel="noopener noreferrer">
+            <PlayMark />
+            Google Play
+          </a>
+        </div>
+      </nav>
+
+      <main id="top">
+        <header className="hero shell">
+          <div className="hero-grid">
+            <div>
+              <Reveal className="status">
+                <span className="tag ok">CAST LINK ONLINE</span>
+                <span className="tag">DLNA READY</span>
+                <span className="tag">MEDIA READY</span>
+              </Reveal>
+              <HeroTitle />
+              <Reveal delay={0.18}>
+                <p className="lead">
+                  Cast photos, videos, and audio from your Android phone to the TV.
+                  CetusCast connects your media to TVs and DLNA-compatible devices
+                  without complicated setup.
+                </p>
+              </Reveal>
+              <Reveal delay={0.3} className="hero-actions">
+                <a className="hud-btn primary" href={PLAY_URL} target="_blank" rel="noopener noreferrer">
+                  <PlayMark />
+                  Get it on Google Play
+                </a>
+                <a className="hud-btn" href="#mission">Explore features</a>
+              </Reveal>
+              <div className="readout" aria-label="App overview">
+                <div><Counter /><span>Downloads</span></div>
+                <div><b>DLNA</b><span>Screen Mirroring</span></div>
+                <div><b>Media</b><span>Photo / Video / Audio</span></div>
+              </div>
+            </div>
+
+            <div className="radar-zone" aria-hidden="true">
+              <div className="radar">
+                <RadarDots />
+              </div>
+              <div className="tv-panel"><div className="tv-inner"><div className="cast-word">TV</div></div></div>
+              <div className="data-line" />
+              <div className="phone-node">
+                <img src="https://picsum.photos/seed/cetuscast-hero/270/480" alt="" />
+              </div>
+              <div className="hud-card one"><b>SIGNAL</b>wireless casting route</div>
+              <div className="hud-card two"><b>MEDIA</b>photo / video / audio</div>
+              <div className="hud-card three"><b>LATENCY</b>smooth streaming target</div>
+            </div>
+          </div>
+        </header>
+
+        <section id="mission">
+          <div className="shell">
+            <Reveal className="section-head">
+              <div><div className="kicker">Casting Toolkit</div><h2>Built for big-screen playback</h2></div>
+              <p>
+                CetusCast focuses the casting flow around four practical jobs: finding
+                compatible TVs, selecting media, sending it wirelessly, and keeping
+                playback easy to control from the phone.
+              </p>
+            </Reveal>
+            <div className="mission-grid" id="mission-grid">
+              <article className="mission" data-id="MOD-01"><h3>DLNA Screen Link</h3><p>Connect to TVs and DLNA-compatible devices with fewer setup steps, so phone media reaches the big screen faster.</p></article>
+              <article className="mission" data-id="MOD-02"><h3>Media Payload</h3><p>Cast photos, videos, and audio for family sharing, living-room playback, and everyday media viewing.</p></article>
+              <article className="mission" data-id="MOD-03"><h3>Phone Control</h3><p>Browse media, start casting, and keep the playback path understandable from a familiar Android screen.</p></article>
+              <article className="mission" data-id="MOD-04"><h3>Stable Stream</h3><p>Designed for smooth, reliable media streaming with less waiting between the phone and the TV.</p></article>
+            </div>
+          </div>
+        </section>
+
+        <section id="ops">
+          <div className="shell ops">
+            <Reveal className="terminal">
+              <div className="terminal-head"><span>CETUSCAST / OPS LOG</span><span>ONLINE</span></div>
+              <Terminal />
+            </Reveal>
+            <div className="preview-stack" aria-label="App screenshot preview">
+              <Reveal delay={0.1} className="shot"><img src="https://picsum.photos/seed/cetuscast-shot1/270/480" alt="CetusCast app screenshot 1" /></Reveal>
+              <Reveal delay={0.22} className="shot"><img src="https://picsum.photos/seed/cetuscast-shot2/270/480" alt="CetusCast app screenshot 2" /></Reveal>
+              <Reveal delay={0.34} className="shot"><img src="https://picsum.photos/seed/cetuscast-shot3/270/480" alt="CetusCast app screenshot 3" /></Reveal>
+            </div>
+          </div>
+        </section>
+
+        <section id="safety">
+          <div className="shell safety">
+            <Reveal className="safety-panel">
+              <div className="kicker">Data Safety Layer</div>
+              <h3>Clear privacy signals</h3>
+              <p>
+                Based on the Google Play data safety section, CetusCast lists no
+                third-party data sharing, no data collection, encrypted data in
+                transit, and an available data deletion request path.
+              </p>
+            </Reveal>
+            <div className="check-list" id="check-list">
+              <div className="check">No data shared with third parties</div>
+              <div className="check">No data collected</div>
+              <div className="check">Data encrypted in transit</div>
+              <div className="check">Deletion request available</div>
+            </div>
+          </div>
+        </section>
+
+        <section id="download" className="download">
+          <div className="shell">
+            <Reveal className="download-box">
+              <div>
+                <div className="kicker">Download App</div>
+                <h2>Start casting to your TV</h2>
+                <p>
+                  Download CetusCast from Google Play and send photos, videos,
+                  and audio from your phone to the big screen. The visual system is
+                  cinematic; the download path stays direct.
+                </p>
+              </div>
+              <a className="play-badge" href={PLAY_URL} target="_blank" rel="noopener noreferrer" aria-label="Get CetusCast on Google Play">
+                <PlayMark />
+                <span><small>GET IT ON</small><b>Google Play</b></span>
+              </a>
+            </Reveal>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div className="shell foot">
+          <div className="foot-brand">
+            <img src={ICON_URL} alt="" />
+            <span>CETUSCAST / CINEMATIC CASTING WEBSITE</span>
+          </div>
+          <div className="foot-sig"><div className="sig-dot" /><span>CAST LINK ACTIVE</span></div>
+          <div>BASED ON PUBLIC GOOGLE PLAY LISTING</div>
+        </div>
+      </footer>
+    </>
   )
 }

@@ -1,194 +1,101 @@
-# CetusCast Landing Page / CetusCast 官方落地页
+# CetusCast Landing Page
 
-CetusCast landing page with bilingual support (EN / 中文).  
-包含中英文双语切换（EN / 中文）。
+CetusCast landing page built with Next.js and React. The page uses a cinematic HUD visual system for a Google Play app that casts photos, videos, and audio from Android phones to TVs and DLNA-compatible devices.
 
-**技术栈 / Tech Stack:** Next.js 16 · React 19 · Tailwind v4 · motion/react · @phosphor-icons/react
+![CetusCast landing page screenshot](./screenshots/7cf6408c337b73ec46de1510353f36ad.png)
 
----
+## Tech Stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- CSS
+- Static export via `next.config.ts`
+
+## Getting Started
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the local development server:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000` in your browser.
+
+## Build
+
+The project is configured for static export with `output: "export"` in `next.config.ts`.
+
+```bash
+npm run build
+```
+
+The generated static site is written to:
+
+```text
+out/
+```
+
+## Deploy
+
+Deploy the contents of `out/` to any static hosting provider or static web server.
+
+For nginx, use the equivalent of:
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    # Set this to the directory where you publish the generated out/ files.
+    root <static-site-root>;
+    index index.html;
+
+    location / {
+        try_files $uri $uri.html $uri/ =404;
+    }
+}
+```
+
+Replace `example.com` and `<static-site-root>` with values for your own environment.
+
+## Project Structure
+
+```text
+cetuscast-landing/
+├── app/
+│   ├── globals.css      # Global visual system and responsive styles
+│   ├── layout.tsx       # Root layout and metadata
+│   ├── page.tsx         # Landing page UI and client-side animations
+│   └── translations.ts  # Legacy translation content kept in the project
+├── screenshots/         # README and project preview images
+├── next.config.ts       # Next.js static export config
+├── package.json         # Scripts and dependencies
+└── README.md
+```
+
+## Notes
+
+- Runtime visuals include a particle canvas, radar sweep, decode title animation, scroll reveal effects, and terminal-style typing.
+- Remote placeholder imagery is loaded from public URLs configured in `next.config.ts`.
+- Replace placeholder media with production app screenshots before publishing publicly.
 
 ## 中文说明
 
-### 本地开发
+这是 CetusCast 的官方落地页项目，使用 Next.js + React 实现。页面目前是赛博 HUD 风格的单页宣传页，支持静态导出，构建产物可以部署到任意静态站点服务。
 
-#### 环境要求
-
-- Node.js 18+
-- npm 9+
-
-#### 安装依赖
+常用命令：
 
 ```bash
 npm install
-```
-
-#### 启动开发服务器
-
-```bash
 npm run dev
-```
-
-浏览器打开 [http://localhost:3000](http://localhost:3000)，保存文件后页面自动热更新。
-
-### 打包静态资源
-
-项目配置为静态导出（`output: "export"`），构建产物为纯 HTML/CSS/JS，可直接部署到 nginx 等静态服务器。
-
-#### 执行构建
-
-```bash
 npm run build
 ```
 
-构建完成后，静态文件输出至 `out/` 目录。
-
-#### 目录结构
-
-```
-out/
-├── index.html          # 首页
-├── _next/              # JS / CSS 资源（含哈希文件名）
-└── ...
-```
-
-### 部署到 nginx
-
-将 `out/` 目录内容复制到 nginx 的 web 根目录，并添加以下配置：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    root /var/www/cetuscast-landing;
-    index index.html;
-
-    location / {
-        try_files $uri $uri.html $uri/ =404;
-    }
-}
-```
-
-> `try_files $uri $uri.html` 保证 Next.js 静态导出的路由（如 `/404`）能正确匹配到对应的 `.html` 文件。
-
-### 快速同步到服务器
-
-```bash
-rsync -avz --delete out/ user@your-server:/var/www/cetuscast-landing/
-```
-
-### 项目结构
-
-```
-cetuscast-landing/
-├── app/
-│   ├── layout.tsx        # 根布局，字体配置
-│   ├── page.tsx          # 落地页主体（含 i18n 逻辑）
-│   ├── translations.ts   # 中英文翻译内容
-│   └── globals.css       # 全局样式（Tailwind v4）
-├── next.config.ts        # Next.js 配置（静态导出）
-└── out/                  # 构建产物（执行 build 后生成）
-```
-
-### 国际化
-
-页面默认显示 **English**，导航栏右侧有 **EN / 中文** 切换按钮。  
-翻译内容统一维护在 `app/translations.ts`，添加新语言只需在该文件新增对应 key。
-
-### 图片资源
-
-占位图片来自 [Picsum Photos](https://picsum.photos)（`picsum.photos`），Google Play 图标来自 [Simple Icons CDN](https://simpleicons.org)（`cdn.simpleicons.org`）。正式上线前建议替换为真实截图。
-
----
-
-## English Version
-
-### Local Development
-
-#### Requirements
-
-- Node.js 18+
-- npm 9+
-
-#### Install dependencies
-
-```bash
-npm install
-```
-
-#### Start dev server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser. The page will hot-reload on file changes.
-
-### Static Export
-
-The project is configured for static export (`output: "export"`), so the build output is plain HTML/CSS/JS that can be deployed to any static host such as nginx.
-
-#### Build
-
-```bash
-npm run build
-```
-
-Build output is generated in the `out/` directory.
-
-#### Directory
-
-```
-out/
-├── index.html          # Homepage
-├── _next/              # JS / CSS assets (hashed filenames)
-└── ...
-```
-
-### Deploy to nginx
-
-Copy the `out/` directory to nginx web root and add:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    root /var/www/cetuscast-landing;
-    index index.html;
-
-    location / {
-        try_files $uri $uri.html $uri/ =404;
-    }
-}
-```
-
-> `try_files $uri $uri.html` ensures Next.js static-exported routes (for example, `/404`) correctly resolve to their `.html` file.
-
-### Sync to server
-
-```bash
-rsync -avz --delete out/ user@your-server:/var/www/cetuscast-landing/
-```
-
-### Project Structure
-
-```
-cetuscast-landing/
-├── app/
-│   ├── layout.tsx        # Root layout and font setup
-│   ├── page.tsx          # Landing page content (including i18n)
-│   ├── translations.ts   # Bilingual translation content
-│   └── globals.css       # Global styles (Tailwind v4)
-├── next.config.ts        # Next.js config (static export)
-└── out/                  # Build output (generated by npm run build)
-```
-
-### Internationalization
-
-Default language is **English**. The top-right nav has an **EN / 中文** language switch.
-All copy is maintained in `app/translations.ts`. To add a new language, add corresponding keys in this file.
-
-### Assets
-
-Placeholder images come from [Picsum Photos](https://picsum.photos), and the Google Play icon is from [Simple Icons CDN](https://simpleicons.org). Replace them with real assets before production launch.
+本地开发地址为 `http://localhost:3000`，构建产物输出到 `out/` 目录。
